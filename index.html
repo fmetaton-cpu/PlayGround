@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>BMW M3 — Шашки в Трафике | 3D от первого лица</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05070f;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+  #game{position:fixed;inset:0}
+  canvas{display:block}
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;display:none}
+  #hud.on{display:block}
+  .hud-top{position:absolute;top:calc(8px + env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:0 12px}
+  .pill{background:rgba(8,12,24,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(80,140,255,.25);border-radius:14px;color:#fff;padding:8px 14px;min-width:86px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+  .pill small{display:block;font-size:10px;letter-spacing:.12em;opacity:.65;text-transform:uppercase}
+  .pill b{font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1}
+  #score-pill b{color:#6df3ff}
+  #combo{position:absolute;top:calc(76px + env(safe-area-inset-top));left:50%;transform:translateX(-50%) scale(.8);background:linear-gradient(135deg,#ff2d78,#ff9a3d);color:#fff;font-weight:900;font-size:18px;padding:8px 20px;border-radius:999px;opacity:0;transition:all .18s;white-space:nowrap;box-shadow:0 0 30px rgba(255,60,120,.6)}
+  #combo.show{opacity:1;transform:translateX(-50%) scale(1)}
+  #combo small{font-weight:600;opacity:.9}
+  #flash{position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 30%,rgba(255,0,0,.55));opacity:0;pointer-events:none;z-index:20;transition:opacity .1s}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.5) 100%)}
+  /* speed lines */
+  #speedlines{position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;transition:opacity .4s;background:repeating-conic-gradient(from 0deg at 50% 50%,transparent 0deg 8deg,rgba(255,255,255,.06) 8deg 9deg)}
+  /* ---------- touch controls ---------- */
+  #touch{position:fixed;left:0;right:0;bottom:0;z-index:11;display:none;justify-content:space-between;align-items:flex-end;padding:0 14px calc(14px + env(safe-area-inset-bottom));pointer-events:none}
+  #touch.on{display:flex}
+  .tcluster{display:flex;gap:12px;pointer-events:auto}
+  .tbtn{width:72px;height:72px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3);background:rgba(15,22,40,.55);backdrop-filter:blur(8px);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;touch-action:none;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+  .tbtn:active,.tbtn.hold{background:rgba(60,140,255,.55);transform:scale(.93)}
+  .tbtn.gas{border-color:rgba(60,255,140,.5);font-size:22px}
+  .tbtn.gas:active,.tbtn.gas.hold{background:rgba(20,200,90,.6)}
+  .tbtn.brake{border-color:rgba(255,80,80,.5)}
+  .tbtn.brake:active,.tbtn.brake.hold{background:rgba(220,40,40,.6)}
+  #steer-hint{position:fixed;bottom:calc(100px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);color:rgba(255,255,255,.55);font-size:12px;z-index:11;pointer-events:none;letter-spacing:.05em}
+  /* ---------- menus ---------- */
+  .screen{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(ellipse at 50% 20%,rgba(30,60,140,.55),rgba(3,5,12,.92) 70%);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .card{width:100%;max-width:460px;background:rgba(10,16,32,.9);border:1px solid rgba(90,150,255,.25);border-radius:22px;padding:26px 22px;color:#fff;text-align:center;box-shadow:0 20px 80px rgba(0,0,0,.6);max-height:92vh;overflow-y:auto}
+  .badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.18em;background:linear-gradient(90deg,#2b6bff,#00d4ff);padding:6px 14px;border-radius:999px;margin-bottom:12px}
+  h1{font-size:30px;line-height:1.1;font-weight:900;margin-bottom:4px}
+  h1 span{background:linear-gradient(90deg,#4da6ff,#7dfcff,#4da6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{opacity:.7;font-size:14px;margin-bottom:16px}
+  .m3stripe{display:flex;height:8px;border-radius:99px;overflow:hidden;margin:14px 0}
+  .m3stripe div{flex:1}.m3stripe .a{background:#5eb4ff}.m3stripe .b{background:#1a2a5e}.m3stripe .c{background:#ff3b47}
+  .btn{display:block;width:100%;border:none;border-radius:14px;padding:15px;font-size:17px;font-weight:800;color:#fff;background:linear-gradient(135deg,#2b6bff,#00c2ff);margin-top:10px;cursor:pointer;box-shadow:0 8px 28px rgba(30,120,255,.4)}
+  .btn:active{transform:scale(.97)}
+  .btn.ghost{background:rgba(255,255,255,.08);box-shadow:none;border:1px solid rgba(255,255,255,.18);font-weight:600;font-size:14px}
+  .btn.red{background:linear-gradient(135deg,#ff2d55,#ff7a3d)}
+  .row2{display:flex;gap:10px}.row2 .btn{margin-top:10px}
+  .rules{text-align:left;font-size:13.5px;line-height:1.65;background:rgba(255,255,255,.05);border-radius:12px;padding:12px 14px;margin-top:12px;opacity:.92}
+  .rules b{color:#7dfcff}
+  #best{margin-top:10px;font-size:13px;opacity:.7;font-variant-numeric:tabular-nums}
+  #final-stats{display:flex;gap:10px;margin:14px 0}
+  #final-stats div{flex:1;background:rgba(255,255,255,.06);border-radius:12px;padding:10px}
+  #final-stats small{display:block;font-size:10px;opacity:.6;letter-spacing:.1em;text-transform:uppercase}
+  #final-stats b{font-size:22px;font-variant-numeric:tabular-nums}
+  #newrecord{display:none;background:linear-gradient(90deg,#ffd34d,#ff9a3d);color:#3a1c00;font-weight:900;border-radius:10px;padding:8px;margin-top:10px;animation:pulse 1s infinite}
+  @keyframes pulse{50%{transform:scale(1.03)}}
+  #loading{position:fixed;inset:0;z-index:50;background:#05070f;color:#fff;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;font-size:14px;opacity:.95}
+  .spin{width:44px;height:44px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#35c4ff;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #mute{position:fixed;top:calc(76px + env(safe-area-inset-top));right:12px;z-index:12;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(8,12,24,.6);color:#fff;font-size:18px;display:none;align-items:center;justify-content:center}
+  #mute.on{display:flex}
+  @media (min-width:820px){ .tbtn{width:84px;height:84px} }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+</head>
+<body>
+<div id="game"></div>
+<div id="vignette"></div>
+<div id="speedlines"></div>
+<div id="flash"></div>
+
+<div id="hud">
+  <div class="hud-top">
+    <div class="pill"><small>Скорость</small><b id="speed">0</b></div>
+    <div class="pill" id="score-pill"><small>Шашки · очки</small><b id="score">0</b></div>
+    <div class="pill"><small>Рекорд</small><b id="top">0</b></div>
+  </div>
+  <div id="combo"></div>
+</div>
+<button id="mute" title="Звук">🔊</button>
+
+<div id="touch">
+  <div class="tcluster">
+    <div class="tbtn" id="btn-left">◀</div>
+    <div class="tbtn" id="btn-right">▶</div>
+  </div>
+  <div class="tcluster">
+    <div class="tbtn brake" id="btn-brake">▼</div>
+    <div class="tbtn gas" id="btn-gas">▲</div>
+  </div>
+</div>
+<div id="steer-hint">◀ тяни по экрану чтобы рулить ▶ · удерживай ▲ газ</div>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <div class="badge">3D · ОТ ПЕРВОГО ЛИЦА · PHONE / TABLET</div>
+    <h1>BMW M3<br><span>ШАШКИ В ТРАФИКЕ</span></h1>
+    <div class="m3stripe"><div class="a"></div><div class="b"></div><div class="c"></div></div>
+    <div class="sub">Ты за рулём M3. Ночной МКАД, плотный трафик с ИИ. Режь шашки вплотную — набирай комбо!</div>
+    <div class="rules">
+      🏁 <b>Газ</b> — авто или удерживай ▲ / W<br>
+      🏎️ <b>Шашка</b> — пролети вплотную мимо машины на скорости: <b>+100…+500</b><br>
+      🔥 <b>Комбо</b> — шашки подряд за 5 сек умножают очки ×2 ×3 ×4…<br>
+      💥 <b>Авария</b> — конец заезда. Не бей машины!<br>
+      📱 <b>Телефон</b> — кнопки ◀ ▶ ▼ ▲ + свайп по экрану. Есть гироскоп.
+    </div>
+    <button class="btn" id="start">▶ СТАРТ · ЗАВЕСТИ M3</button>
+    <div class="row2">
+      <button class="btn ghost" id="gyro">📱 Гироскоп: выкл</button>
+      <button class="btn ghost" id="sound-btn">🔊 Звук: вкл</button>
+    </div>
+    <div id="best">Рекорд: 0 · Шашек: 0</div>
+  </div>
+</div>
+
+<div class="screen" id="over" style="display:none">
+  <div class="card">
+    <div class="badge" style="background:linear-gradient(90deg,#ff2d55,#ff9a3d)">💥 АВАРИЯ</div>
+    <h1>Разбил M3!</h1>
+    <div class="sub" id="crash-text">Держи дистанцию, гонщик.</div>
+    <div id="newrecord">🏆 НОВЫЙ РЕКОРД!</div>
+    <div id="final-stats">
+      <div><small>Очки</small><b id="f-score">0</b></div>
+      <div><small>Шашки</small><b id="f-near">0</b></div>
+      <div><small>Метры</small><b id="f-dist">0</b></div>
+    </div>
+    <button class="btn red" id="restart">↻ ЕЩЁ РАЗ</button>
+    <button class="btn ghost" id="to-menu">В меню</button>
+  </div>
+</div>
+
+<div id="loading"><div class="spin"></div><div>Грузим трассу…</div></div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ================= BASE ================= */
+const container = document.getElementById('game');
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+container.appendChild(renderer.domElement);
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070b18);
+scene.fog = new THREE.Fog(0x070b18, 40, 230);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 500);
+camera.position.set(-0.42, 1.18, 0.4); // место водителя (левый руль)
+scene.add(camera);
+
+scene.add(new THREE.HemisphereLight(0x8fb4ff, 0x0a0c14, 0.85));
+const moon = new THREE.DirectionalLight(0x9db8ff, 0.7); moon.position.set(-40,80,-60); scene.add(moon);
+const head = new THREE.SpotLight(0xcfe6ff, 60, 120, 0.5, 0.45, 1.2);
+head.position.set(-0.42,1.1,0.2); head.target.position.set(-0.42,0.4,-40);
+camera.add(head); camera.add(head.target);
+// тёплая подсветка салона
+const cabinLight = new THREE.PointLight(0x2a5cff, 1.2, 4); cabinLight.position.set(-0.4,0.9,0.6); camera.add(cabinLight);
+
+/* ================= ROAD ================= */
+const LANE_X = [-4.5,-1.5,1.5,4.5], LANE_W = 3;
+const roadTexC = document.createElement('canvas'); roadTexC.width=256; roadTexC.height=256;
+{
+  const g = roadTexC.getContext('2d');
+  g.fillStyle='#171a22'; g.fillRect(0,0,256,256);
+  for(let i=0;i<700;i++){ g.fillStyle=`rgba(255,255,255,${Math.random()*0.03})`; g.fillRect(Math.random()*256,Math.random()*256,2,2); }
+  g.fillStyle='#e8ecff'; g.fillRect(0,0,10,120); g.fillRect(246,0,10,120); // крайние
+  g.fillStyle='#ffd34d';
+  for(let i=0;i<4;i++){ g.fillRect(60+i*48,0,6,120); } // пунктир полос
+}
+const roadTex = new THREE.CanvasTexture(roadTexC);
+roadTex.wrapS=roadTex.wrapT=THREE.RepeatWrapping; roadTex.repeat.set(1,24); roadTex.anisotropy=4;
+const road = new THREE.Mesh(new THREE.PlaneGeometry(15,600), new THREE.MeshStandardMaterial({map:roadTex,roughness:.9}));
+road.rotation.x=-Math.PI/2; road.position.z=-240; scene.add(road);
+// обочины + отбойники
+for(const s of [-1,1]){
+  const shoulder = new THREE.Mesh(new THREE.PlaneGeometry(4,600), new THREE.MeshStandardMaterial({color:0x0c0f16,roughness:1}));
+  shoulder.rotation.x=-Math.PI/2; shoulder.position.set(s*9.5,-0.01,-240); scene.add(shoulder);
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.25,0.8,600), new THREE.MeshStandardMaterial({color:0x3a4356,metalness:.7,roughness:.35}));
+  rail.position.set(s*11.6,0.5,-240); scene.add(rail);
+  const glow = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.08,600), new THREE.MeshBasicMaterial({color:s<0?0xff3b47:0x35c4ff}));
+  glow.position.set(s*11.45,0.95,-240); scene.add(glow);
+}
+// фонари
+const poleGeo = new THREE.CylinderGeometry(0.09,0.12,7,6), poleMat = new THREE.MeshStandardMaterial({color:0x222a3a});
+const lampGeo = new THREE.SphereGeometry(0.22,8,8), lampMat = new THREE.MeshBasicMaterial({color:0xffe6a8});
+const lamps=[];
+for(let i=0;i<24;i++){
+  const s=i%2?1:-1, z=-i*25+10;
+  const p=new THREE.Mesh(poleGeo,poleMat); p.position.set(s*12.5,3.5,z); scene.add(p);
+  const arm=new THREE.Mesh(new THREE.BoxGeometry(s*-2.4,0.12,0.12),poleMat); arm.position.set(s*11.3,6.9,z); scene.add(arm);
+  const l=new THREE.Mesh(lampGeo,lampMat); l.position.set(s*10.2,6.8,z); scene.add(l);
+  const pl=new THREE.PointLight(0xffd9a0,18,34,1.8); pl.position.copy(l.position); scene.add(pl);
+  lamps.push({mesh:l,pl,z});
+}
+// город на горизонте + звёзды
+{
+  const c=document.createElement('canvas'); c.width=1024; c.height=128; const g=c.getContext('2d');
+  const gr=g.createLinearGradient(0,0,0,128); gr.addColorStop(0,'#0a1030'); gr.addColorStop(1,'#070b18');
+  g.fillStyle=gr; g.fillRect(0,0,1024,128);
+  for(let x=0;x<1024;x+=14){ const h=20+Math.random()*70; g.fillStyle='#0d1430'; g.fillRect(x,128-h,12,h);
+    for(let w=0;w<3;w++)for(let hh=0;hh<6;hh++) if(Math.random()<.4){g.fillStyle=Math.random()<.5?'#ffd97a':'#7dfcff'; g.fillRect(x+2+w*3,128-h+4+hh*9,2,3);} }
+  const t=new THREE.CanvasTexture(c);
+  const sky=new THREE.Mesh(new THREE.PlaneGeometry(900,110), new THREE.MeshBasicMaterial({map:t,fog:false}));
+  sky.position.set(0,32,-320); scene.add(sky);
+  const sg=new THREE.BufferGeometry(); const pos=new Float32Array(300*3);
+  for(let i=0;i<300;i++){pos[i*3]=(Math.random()-.5)*700;pos[i*3+1]=60+Math.random()*200;pos[i*3+2]=-300-Math.random()*100;}
+  sg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:1.4,sizeAttenuation:false,fog:false,transparent:true,opacity:.7})));
+}
+// деревья/щиты по бокам (пул)
+const sidePool=[];
+{
+  const treeMat=new THREE.MeshStandardMaterial({color:0x0e3a24,roughness:1});
+  const trunkMat=new THREE.MeshStandardMaterial({color:0x2a1d12});
+  for(let i=0;i<40;i++){
+    const grp=new THREE.Group();
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.25,2,5),trunkMat); trunk.position.y=1; grp.add(trunk);
+    const cr=new THREE.Mesh(new THREE.ConeGeometry(1.4+Math.random(),3.5,6),treeMat); cr.position.y=3.6; grp.add(cr);
+    const s=Math.random()<.5?-1:1; grp.position.set(s*(14+Math.random()*14),0,-Math.random()*500);
+    scene.add(grp); sidePool.push(grp);
+  }
+}
+
+/* ================= COCKPIT (BMW M3) ================= */
+const cockpit = new THREE.Group(); camera.add(cockpit);
+function box(w,h,d,color,x,y,z,rough=.7,metal=.1){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal}));
+  m.position.set(x,y,z); cockpit.add(m); return m;
+}
+// торпедо
+box(1.9,0.28,0.7,0x14161d,0,-0.12,-0.75,0.9);
+box(1.9,0.06,0.72,0x0a0b10,0,0.03,-0.75,0.6);           // верхняя накладка
+box(0.9,0.16,0.02,0x05060a,0.28,-0.02,-0.44,0.4);        // экран мультимедиа
+box(1.9,0.1,0.1,0x1c2030,0,-0.3,-0.62,0.5,0.4);          // карбон-полоса
+// приборка за рулём
+const dashC=document.createElement('canvas'); dashC.width=256; dashC.height=96;
+const dashTex=new THREE.CanvasTexture(dashC);
+{
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(0.42,0.15),new THREE.MeshBasicMaterial({map:dashTex,transparent:true}));
+  m.position.set(-0.42,0.02,-0.62); cockpit.add(m);
+}
+function drawDash(speedKmh){
+  const g=dashC.getContext('2d'); g.clearRect(0,0,256,96);
+  g.fillStyle='rgba(2,4,10,.92)'; g.beginPath(); g.roundRect(0,0,256,96,18); g.fill();
+  g.strokeStyle='rgba(90,150,255,.5)'; g.stroke();
+  g.fillStyle='#7dfcff'; g.font='700 34px monospace'; g.textAlign='center';
+  g.fillText(String(Math.round(speedKmh)).padStart(3,' '),128,46);
+  g.fillStyle='rgba(255,255,255,.55)'; g.font='600 13px sans-serif'; g.fillText('KM/H  ·  M3',128,68);
+  g.fillStyle='#ff3b47'; g.fillRect(20,80,216*(Math.min(speedKmh,300)/300),5);
+  dashTex.needsUpdate=true;
+}
+drawDash(0);
+// медиа-экран
+{
+  const c=document.createElement('canvas'); c.width=256; c.height=64; const g=c.getContext('2d');
+  g.fillStyle='#04070f'; g.fillRect(0,0,256,64); g.fillStyle='#35c4ff'; g.font='700 20px sans-serif'; g.textAlign='center';
+  g.fillText('♪ M POWER — DRIVE',128,28); g.fillStyle='rgba(255,255,255,.5)'; g.font='12px sans-serif'; g.fillText('ШАШКИ · 00:00 · 22°C',128,48);
+  const t=new THREE.CanvasTexture(c);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.12),new THREE.MeshBasicMaterial({map:t}));
+  m.position.set(0.28,0.03,-0.425); m.rotation.x=-0.15; cockpit.add(m);
+}
+// руль M
+const wheelG = new THREE.Group(); wheelG.position.set(-0.42,-0.18,-0.45); cockpit.add(wheelG);
+{
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(0.19,0.028,10,32),new THREE.MeshStandardMaterial({color:0x0c0d12,roughness:.5}));
+  wheelG.add(rim);
+  const sp=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.06,0.03),new THREE.MeshStandardMaterial({color:0x16181f,roughness:.5,metalness:.3}));
+  wheelG.add(sp);
+  const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.05,16),new THREE.MeshStandardMaterial({color:0x1a1d26}));
+  hub.rotation.x=Math.PI/2; wheelG.add(hub);
+  // M-логотип
+  const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');
+  g.fillStyle='#0a0a0a'; g.beginPath(); g.arc(64,64,60,0,7); g.fill();
+  g.fillStyle='#5eb4ff'; g.fillRect(34,34,30,30); g.fillStyle='#1a2a5e'; g.fillRect(64,34,30,30);
+  g.fillStyle='#ff3b47'; g.fillRect(49,64,30,30); g.fillStyle='#fff'; g.font='900 34px sans-serif'; g.textAlign='center'; g.fillText('M',64,100);
+  const t=new THREE.CanvasTexture(c);
+  const logo=new THREE.Mesh(new THREE.CircleGeometry(0.032,20),new THREE.MeshBasicMaterial({map:t}));
+  logo.position.z=0.028; wheelG.add(logo);
+  // M-полоски на руле
+  const s1=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.012,0.005),new THREE.MeshBasicMaterial({color:0x5eb4ff})); s1.position.set(-0.02,0.1,0.01); wheelG.add(s1);
+  const s2=s1.clone(); s2.material=new THREE.MeshBasicMaterial({color:0xff3b47}); s2.position.x=0.02; wheelG.add(s2);
+}
+// стойки + зеркало + капот
+box(0.09,0.7,0.09,0x0b0d13,-0.95,0.25,-0.9);
+box(0.09,0.7,0.09,0x0b0d13,0.95,0.25,-0.9);
+box(2.0,0.09,0.12,0x0b0d13,0,0.6,-0.92);
+box(0.34,0.12,0.03,0x05060a,0,0.42,-0.85); // салонное зеркало
+{
+  const mir=document.createElement('canvas'); mir.width=256; mir.height=48; const g=mir.getContext('2d');
+  g.fillStyle='#0a1220'; g.fillRect(0,0,256,48);
+  g.fillStyle='#ff3b47'; for(let i=0;i<8;i++) g.fillRect(10+i*30,18,12,8); // отражения фар сзади
+  const t=new THREE.CanvasTexture(mir);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.055),new THREE.MeshBasicMaterial({map:t}));
+  m.position.set(0,0.415,-0.833); m.rotation.y=Math.PI; cockpit.add(m);
+}
+// капот M3 с ноздрями (видно из салона)
+{
+  const hood=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.06,1.6),new THREE.MeshStandardMaterial({color:0x0d1e4a,roughness:.3,metalness:.8}));
+  hood.position.set(-0.1,-0.42,-1.7); cockpit.add(hood);
+  const bulge=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.07,1.3),new THREE.MeshStandardMaterial({color:0x0a1840,roughness:.3,metalness:.8}));
+  bulge.position.set(-0.1,-0.38,-1.7); cockpit.add(bulge);
+}
+// руки на руле (простые)
+const handL=box(0.07,0.07,0.12,0xd9a17c,-0.55,-0.16,-0.44,0.8);
+const handR=box(0.07,0.07,0.12,0xd9a17c,-0.29,-0.16,-0.44,0.8);
+
+/* ================= TRAFFIC CARS ================= */
+const carColors=[0xdfe6ff,0xff3b47,0xffc93d,0x35c4ff,0x8aff6a,0xff7ad9,0xff6a00,0x9a8aff,0x444c66,0x00e6b0];
+function makeCar(color){
+  const g=new THREE.Group();
+  const bodyMat=new THREE.MeshStandardMaterial({color,roughness:.35,metalness:.6});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.62,4.1),bodyMat); body.position.y=0.72; g.add(body);
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.55,2.1),new THREE.MeshStandardMaterial({color:0x0a0f1e,roughness:.15,metalness:.4}));
+  cab.position.set(0,1.25,-0.2); g.add(cab);
+  const wg=new THREE.CylinderGeometry(0.34,0.34,0.28,12), wm=new THREE.MeshStandardMaterial({color:0x05060a,roughness:.8});
+  for(const [x,z] of [[-0.85,1.35],[0.85,1.35],[-0.85,-1.35],[0.85,-1.35]]){
+    const w=new THREE.Mesh(wg,wm); w.rotation.z=Math.PI/2; w.position.set(x,0.34,z); g.add(w);
+  }
+  // задние фонари (к игроку)
+  const tl=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.16,0.06),new THREE.MeshBasicMaterial({color:0xff1a2e}));
+  tl.position.set(0,0.85,2.08); g.add(tl);
+  const tlGlow=new THREE.PointLight(0xff1a2e,0,14,1.8); tlGlow.position.set(0,0.9,2.4); g.add(tlGlow);
+  // передние фары
+  const hl=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.14,0.06),new THREE.MeshBasicMaterial({color:0xeaf4ff}));
+  hl.position.set(0,0.82,-2.08); g.add(hl);
+  // стоп-сигнал яркость регулируем
+  g.userData={tlGlow,tl};
+  return g;
+}
+const traffic=[]; // {mesh,x,z,v,lane,brake,wob,passed}
+function spawnTraffic(zFar, forceLane=-1){
+  const taken=new Set(traffic.filter(t=>t.z<zFar+30&&t.z>zFar-30).map(t=>Math.round(t.targetLane)));
+  let lane = forceLane>=0?forceLane:Math.floor(Math.random()*4);
+  // не перекрываем весь ряд: оставляем коридор
+  if(taken.size>=4) return;
+  if(taken.has(lane)) lane=[0,1,2,3].find(l=>!taken.has(l)) ?? lane;
+  const color=carColors[Math.floor(Math.random()*carColors.length)];
+  const mesh=makeCar(color); scene.add(mesh);
+  const v=(55+Math.random()*75)/3.6; // м/с
+  const car={mesh,x:LANE_X[lane],z:zFar,v,lane,targetLane:lane,brake:false,passed:false,blinker:0,aiT:Math.random()*3};
+  mesh.position.set(car.x,0,car.z);
+  traffic.push(car);
+}
+
+/* ================= AUDIO ================= */
+let AC=null, engOsc=null, engGain=null, engFilter=null, soundOn=true;
+function initAudio(){
+  if(AC) return;
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    engOsc=AC.createOscillator(); engOsc.type='sawtooth'; engOsc.frequency.value=60;
+    const o2=AC.createOscillator(); o2.type='square'; o2.frequency.value=30;
+    engFilter=AC.createBiquadFilter(); engFilter.type='lowpass'; engFilter.frequency.value=500;
+    engGain=AC.createGain(); engGain.gain.value=0.0;
+    engOsc.connect(engFilter); o2.connect(engFilter); engFilter.connect(engGain); engGain.connect(AC.destination);
+    engOsc.start(); o2.start(); engOsc._o2=o2;
+  }catch(e){}
+}
+function engineUpdate(speedKmh,on){
+  if(!AC||!engGain) return;
+  const t=AC.currentTime;
+  const rpm=60+speedKmh*1.5;
+  engOsc.frequency.setTargetAtTime(soundOn&&on?rpm:0,t,0.1);
+  engOsc._o2.frequency.setTargetAtTime(soundOn&&on?rpm/2:0,t,0.1);
+  engFilter.frequency.setTargetAtTime(300+speedKmh*6,t,0.1);
+  engGain.gain.setTargetAtTime(soundOn&&on?0.05:0,t,0.1);
+}
+function beep(freq,dur,type='sine',vol=.2){
+  if(!AC||!soundOn) return;
+  const o=AC.createOscillator(),g=AC.createGain(); o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+dur);
+  o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+dur);
+}
+const sNear=()=>{beep(880,.18,'sine',.25); setTimeout(()=>beep(1320,.22,'sine',.22),90);};
+const sCrash=()=>{beep(120,.5,'sawtooth',.4); setTimeout(()=>beep(60,.7,'square',.3),80);};
+
+/* ================= STATE & INPUT ================= */
+const S={mode:'menu',x:-1.5,speed:0,speedKmh:0,steer:0,score:0,near:0,combo:0,comboT:0,dist:0,spawnT:0,shake:0,best:+(localStorage.getItem('m3_best')||0),bestNear:+(localStorage.getItem('m3_near')||0)};
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true; if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();});
+addEventListener('keyup',e=>keys[e.code]=false);
+
+const touchState={left:false,right:false,gas:false,brake:false,dragX:0,dragging:false};
+function bindHold(id,prop){
+  const el=document.getElementById(id);
+  const on=e=>{e.preventDefault();touchState[prop]=true;el.classList.add('hold');};
+  const off=e=>{e.preventDefault();touchState[prop]=false;el.classList.remove('hold');};
+  el.addEventListener('pointerdown',on); el.addEventListener('pointerup',off);
+  el.addEventListener('pointercancel',off); el.addEventListener('pointerleave',off);
+}
+bindHold('btn-left','left'); bindHold('btn-right','right'); bindHold('btn-gas','gas'); bindHold('btn-brake','brake');
+// свайп-руление
+let dragStartX=0;
+renderer.domElement.addEventListener('pointerdown',e=>{touchState.dragging=true;dragStartX=e.clientX-touchState.dragX;});
+addEventListener('pointermove',e=>{if(touchState.dragging)touchState.dragX=e.clientX-dragStartX;});
+addEventListener('pointerup',()=>{touchState.dragging=false;});
+// затухание свайпа
+setInterval(()=>{ if(!touchState.dragging) touchState.dragX*=0.9; },50);
+
+// гироскоп
+let gyroOn=false, gyroSteer=0;
+document.getElementById('gyro').onclick=async e=>{
+  try{
+    if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission){
+      const r=await DeviceOrientationEvent.requestPermission(); if(r!=='granted')return;
+    }
+  }catch(err){}
+  gyroOn=!gyroOn; e.target.textContent=`📱 Гироскоп: ${gyroOn?'вкл':'выкл'}`;
+};
+addEventListener('deviceorientation',e=>{ if(gyroOn&&e.gamma!=null) gyroSteer=Math.max(-1,Math.min(1,e.gamma/30)); });
+
+let muted=false;
+function setSound(v){soundOn=v;muted=!v;document.getElementById('sound-btn').textContent=`🔊 Звук: ${v?'вкл':'выкл'}`;document.getElementById('mute').textContent=v?'🔊':'🔇';}
+document.getElementById('sound-btn').onclick=()=>setSound(!soundOn);
+document.getElementById('mute').onclick=()=>setSound(!soundOn);
+
+/* ================= UI ================= */
+const $=id=>document.getElementById(id);
+function showCombo(text,sub){
+  const c=$('combo'); c.innerHTML=`${text} <small>${sub||''}</small>`; c.classList.add('show');
+  clearTimeout(showCombo._t); showCombo._t=setTimeout(()=>c.classList.remove('show'),1100);
+}
+function updateBest(){ $('top').textContent=S.best; $('best').textContent=`Рекорд: ${S.best} · Шашек: ${S.bestNear}`; }
+updateBest();
+function startGame(){
+  initAudio(); AC&&AC.resume&&AC.resume();
+  for(const t of traffic) scene.remove(t.mesh); traffic.length=0;
+  Object.assign(S,{mode:'play',x:-1.5,speed:18,score:0,near:0,combo:0,comboT:0,dist:0,spawnT:0,shake:0,steer:0});
+  touchState.dragX=0;
+  for(let i=0;i<10;i++) spawnTraffic(-40-i*28);
+  $('menu').style.display='none'; $('over').style.display='none';
+  $('hud').classList.add('on'); $('touch').classList.add('on'); $('mute').classList.add('on');
+  $('steer-hint').style.display='block'; setTimeout(()=>$('steer-hint').style.display='none',5000);
+  // обратный отсчёт
+  showCombo('ПОЕХАЛИ!','держи шашки 🔥');
+  beep(440,.15,'square',.25); setTimeout(()=>beep(660,.15,'square',.25),160); setTimeout(()=>beep(990,.3,'square',.3),320);
+}
+function gameOver(reason){
+  S.mode='over'; sCrash(); S.shake=1;
+  $('flash').style.opacity=1; setTimeout(()=>$('flash').style.opacity=0,450);
+  engineUpdate(0,false);
+  const isRec=S.score>S.best;
+  if(isRec){S.best=S.score;localStorage.setItem('m3_best',S.best);}
+  if(S.near>S.bestNear){S.bestNear=S.near;localStorage.setItem('m3_near',S.bestNear);}
+  updateBest();
+  $('f-score').textContent=S.score; $('f-near').textContent=S.near; $('f-dist').textContent=Math.round(S.dist);
+  $('newrecord').style.display=isRec?'block':'none';
+  $('crash-text').textContent=reason||'Держи дистанцию, гонщик.';
+  setTimeout(()=>{ $('over').style.display='flex'; $('touch').classList.remove('on'); },900);
+}
+$('start').onclick=startGame; $('restart').onclick=startGame;
+$('to-menu').onclick=()=>{ $('over').style.display='none'; $('menu').style.display='flex'; $('hud').classList.remove('on'); };
+
+/* ================= LOOP ================= */
+const clock=new THREE.Clock();
+let dashT=0;
+function frame(){
+  requestAnimationFrame(frame);
+  const dt=Math.min(clock.getDelta(),0.05);
+  const t=clock.elapsedTime;
+  if(S.mode==='play') update(dt,t);
+  else { // меню: медленная езда камеры для фона
+    for(const c of traffic){ c.z+=c.v*dt; c.mesh.position.z=c.z; if(c.z>15){c.z-=520;} }
+    roadTex.offset.y-=dt*0.35;
+    wheelG.rotation.z=Math.sin(t*.6)*.2;
+  }
+  // тряска камеры
+  if(S.shake>0){S.shake=Math.max(0,S.shake-dt*1.4);
+    camera.position.x=-0.42+S.x*0.0+(Math.random()-.5)*0.09*S.shake;
+    camera.position.y=1.18+(Math.random()-.5)*0.09*S.shake;
+    camera.rotation.z=(Math.random()-.5)*0.06*S.shake;
+  }
+  renderer.render(scene,camera);
+}
+
+function update(dt,t){
+  /* --- ввод --- */
+  let steerIn=0, gasIn=false, brakeIn=false;
+  if(keys['ArrowLeft']||keys['KeyA'])steerIn-=1;
+  if(keys['ArrowRight']||keys['KeyD'])steerIn+=1;
+  if(keys['ArrowUp']||keys['KeyW'])gasIn=true;
+  if(keys['ArrowDown']||keys['KeyS']||keys['Space'])brakeIn=true;
+  if(touchState.left)steerIn-=1; if(touchState.right)steerIn+=1;
+  if(touchState.gas)gasIn=true; if(touchState.brake)brakeIn=true;
+  if(touchState.dragging) steerIn+=Math.max(-1,Math.min(1,touchState.dragX/140));
+  if(gyroOn) steerIn+=gyroSteer;
+  // на телефоне газ по умолчанию включён
+  const isTouch=('ontouchstart'in window)||navigator.maxTouchPoints>0;
+  if(isTouch&&!touchState.brake) gasIn=true;
+  steerIn=Math.max(-1.4,Math.min(1.4,steerIn));
+
+  /* --- скорость --- */
+  const maxV=82, accel=gasIn?16:6, brake=brakeIn?38:0, drag=2.2+S.speed*0.045;
+  S.speed+= (accel-brake-drag)*dt;
+  S.speed=Math.max(8,Math.min(maxV,S.speed));
+  S.speedKmh=S.speed*3.6;
+  S.dist+=S.speed*dt;
+
+  /* --- руление --- */
+  const grip=1-(S.speedKmh/420); // на скорости руль тяжелее
+  S.steer+= (steerIn-S.steer)*Math.min(1,dt*7);
+  S.x+=S.steer*(9+S.speed*0.16)*grip*dt;
+  S.x=Math.max(-6.4,Math.min(6.4,S.x));
+  // отбойник бьёт
+  if(Math.abs(S.x)>6.1){ S.speed=Math.max(10,S.speed-30*dt); S.shake=Math.max(S.shake,0.25); }
+
+  /* --- камера/салон --- */
+  camera.position.x=-0.42+S.x;
+  camera.position.y=1.18+Math.sin(t*22)*0.006*(S.speedKmh/200);
+  camera.rotation.y=-S.steer*0.14;
+  camera.rotation.z=-S.steer*0.03;
+  camera.fov=68+S.speedKmh*0.045; camera.updateProjectionMatrix();
+  wheelG.rotation.z=-S.steer*1.9;
+  handL.position.x=-0.42-Math.cos(S.steer)*0.13; handR.position.x=-0.42+Math.cos(S.steer)*0.13;
+  dashT+=dt; if(dashT>0.12){dashT=0;drawDash(S.speedKmh);}
+  $('speed').textContent=Math.round(S.speedKmh);
+  $('score').textContent=S.score;
+  $('speedlines').style.opacity=S.speedKmh>190?((S.speedKmh-190)/110):0;
+
+  /* --- дорога --- */
+  roadTex.offset.y+=S.speed*dt/25;
+  for(const l of lamps){ l.z+=S.speed*dt; if(l.z>15){l.z-=600;} l.mesh.position.z=l.z; l.pl.position.z=l.z; }
+  for(const s of sidePool){ s.position.z+=S.speed*dt; if(s.position.z>20){s.position.z-=520; s.position.x=(Math.random()<.5?-1:1)*(14+Math.random()*14);} }
+
+  /* --- спавн --- */
+  S.spawnT-=dt;
+  const density=Math.min(1.15,0.45+S.speedKmh/320); // чем быстрее — плотнее
+  if(S.spawnT<=0){
+    S.spawnT=(0.55+Math.random()*0.7)/density;
+    // держим коридор: не занимать все 4 полосы в одном срезе
+    spawnTraffic(-260-Math.random()*40);
+    if(Math.random()<.5) spawnTraffic(-280-Math.random()*60);
+  }
+
+  /* --- ИИ трафика --- */
+  if(S.comboT>0){S.comboT-=dt; if(S.comboT<=0)S.combo=0;}
+  for(let i=traffic.length-1;i>=0;i--){
+    const c=traffic[i];
+    c.aiT-=dt;
+    // ищем машину впереди в той же полосе
+    let ahead=null,ad=1e9;
+    for(const o of traffic){ if(o===c)continue;
+      const dz=o.z-c.z; if(dz<-26||dz>-2)continue;
+      if(Math.abs(o.x-c.x)<1.6&&dz<ad){ad=dz;ahead=o;} }
+    let targetV=c.v0??c.v;
+    if(!c.v0)c.v0=c.v;
+    if(ahead&&ad<22){ targetV=Math.min(targetV,ahead.v*(ad/22)); c.brake=ad<12; }
+    else c.brake=false;
+    // случайное перестроение если упёрся
+    if(c.aiT<=0){
+      c.aiT=2+Math.random()*4;
+      if(ahead&&ad<25&&Math.random()<.6){
+        const opts=[c.lane-1,c.lane+1].filter(l=>l>=0&&l<4&&!traffic.some(o=>o!==c&&o.lane===l&&Math.abs(o.z-c.z)<16));
+        if(opts.length){c.targetLane=opts[Math.floor(Math.random()*opts.length)];}
+      } else if(Math.random()<.15){
+        const nl=c.lane+(Math.random()<.5?-1:1);
+        if(nl>=0&&nl<4) c.targetLane=nl;
+      }
+    }
+    c.lane+= (c.targetLane-c.lane)*Math.min(1,dt*0.8);
+    c.x+=(LANE_X[Math.round(c.targetLane)]-c.x)*Math.min(1,dt*1.2);
+    c.v+=(targetV-c.v)*Math.min(1,dt*(c.brake?3:0.8));
+    c.z+=(c.v-S.speed)*dt; // относительное движение
+    c.mesh.position.set(c.x,0,c.z);
+    c.mesh.rotation.y=(LANE_X[Math.round(Math.max(0,Math.min(3,c.targetLane)))]-c.x)*-0.06;
+    // стоп-сигналы
+    c.mesh.userData.tlGlow.intensity=c.brake?6:1.2;
+    c.mesh.userData.tl.material.color.setHex(c.brake?0xff2038:0x8a1020);
+    // убрали далеко позади / впереди-пусто
+    if(c.z>14||c.z<-420){ scene.remove(c.mesh); traffic.splice(i,1); continue; }
+    // столкновение
+    const dx=Math.abs(c.x-S.x), dz=Math.abs(c.z-0.6);
+    if(dx<1.75&&dz<3.6){
+      gameOver(['Лобовое! Смотри вперёд.','Боковой удар! Зеркала смотри.','Догнал! Держи дистанцию.'][Math.floor(Math.random()*3)]);
+      return;
+    }
+    // шашка: только что обошли вплотную
+    if(!c.passed&&c.z>4){
+      c.passed=true;
+      const relV=S.speedKmh-c.v*3.6;
+      if(dx<2.6&&dx>0.9&&relV>25&&S.speedKmh>90){
+        S.near++; S.combo++; S.comboT=5;
+        const base=Math.round(100+relV*2+(2.6-dx)*90);
+        const pts=base*S.combo;
+        S.score+=pts;
+        showCombo(`ШАШКА +${pts}`, S.combo>1?`комбо ×${S.combo} 🔥`:'вплотную! +бонус');
+        sNear(); S.shake=Math.max(S.shake,0.12);
+      }
+    }
+  }
+  engineUpdate(S.speedKmh,true);
+}
+
+document.getElementById('loading').style.display='none';
+frame();
+</script>
+</body>
+</html>
